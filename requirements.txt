@@ -6,3 +6,5 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 rank_bm25
 openai==0.27.8
+gunicorn
+
