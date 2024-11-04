@@ -1,0 +1,21 @@
+# 1. Initialize git repo
+git init
+
+# 2. Add all files
+git add .
+
+# 3. Commit changes
+git commit -m "Initial commit of Flask app"
+
+# 4. Add GitHub remote
+git remote add origin https://github.com/ladyFaye1998/flask-search-api.git
+
+# 5. Push code to GitHub
+git push -u origin master
+
+# 6. After adding Procfile and requirements.txt
+git add requirements.txt Procfile
+git commit -m "Add requirements.txt and Procfile for Render"
+git push
+
+
