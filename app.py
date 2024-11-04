@@ -26,6 +26,7 @@ app = Flask(__name__)
 import os
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
+#openai.api_key = 'sk-XXXX'
 
 # Global variables for ANN index and embeddings
 ann_index = None
