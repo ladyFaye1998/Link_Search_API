@@ -15,29 +15,24 @@ from rank_bm25 import BM25Okapi
 import openai
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize the OpenAI API key
-# Set your OpenAI API key here
+# Load environment variables
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
+# Initialize the OpenAI API key
 openai.api_key = os.getenv('OPENAI_API_KEY')
-#openai.api_key = 'sk-XXXX'
 if openai.api_key:
     logger.info("OpenAI API key loaded successfully.")
 else:
     logger.error("OpenAI API key is missing.")
     sys.exit(1)  # Exit the application if the API key is essential
-
-
 
 # Global variables for ANN index and embeddings
 ann_index = None
@@ -76,7 +71,6 @@ def load_links_from_json(file_path='All_Links.json'):
     except Exception as e:
         logger.error(f"Error reading '{file_path}': {e}", exc_info=True)
     return links
-
 
 # Helper function: Text preprocessing
 def preprocess_text(text):
@@ -247,7 +241,6 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
     else:
         logger.error("Tokenized corpus is empty. BM25 index not built.")
 
-
 # Helper function: Build ANN index using FAISS
 def build_ann_index(embeddings):
     global ann_index
@@ -262,7 +255,7 @@ def build_ann_index(embeddings):
 # Function to search for the most relevant links based on query
 def find_relevant_links(query, top_n=3):
     if not links or content_embeddings is None or ann_index is None or bm25 is None:
-        logger.warning("Data is not ready for searching. Returning default results. ")
+        logger.warning("Data is not ready for searching. Returning default results.")
         # Return top_n empty results
         return [{'url': '', 'description': '', 'score': 0.0} for _ in range(top_n)]
 
@@ -391,23 +384,17 @@ def home():
         }
     })
 
-if __name__ == '__main__':
-    # Set re_fetch based on an environment variable
-    re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
-    cache_file = 'cached_contents.json'
+# Call precompute_contents at the module level
+logger.info("Starting application and initializing data structures...")
 
-    # Check if cache file exists; if not, set re_fetch to True
-    if not os.path.exists(cache_file):
-        logger.info("Cache file not found. Fetching content and computing embeddings.")
-        re_fetch = True
+re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
+cache_file = 'cached_contents.json'
 
-    # Precompute contents and build ANN index before starting the server
-    precompute_contents(re_fetch)
+# Check if cache file exists; if not, set re_fetch to True
+if not os.path.exists(cache_file):
+    logger.info("Cache file not found. Fetching content and computing embeddings.")
+    re_fetch = True
 
-    # Use the port provided by the environment or default to 10000
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-
-
+# Precompute contents and build ANN index
+precompute_contents(re_fetch)
 
