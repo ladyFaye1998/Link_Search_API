@@ -15,8 +15,9 @@ from rank_bm25 import BM25Okapi
 import openai
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
 
 # Initialize Flask app
 app = Flask(__name__)
