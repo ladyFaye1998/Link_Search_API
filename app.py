@@ -30,11 +30,12 @@ load_dotenv()
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 #openai.api_key = 'sk-XXXX'
-
 if openai.api_key:
     logger.info("OpenAI API key loaded successfully.")
 else:
     logger.error("OpenAI API key is missing.")
+    sys.exit(1)  # Exit the application if the API key is essential
+
 
 
 # Global variables for ANN index and embeddings
@@ -55,6 +56,7 @@ lemmatizer = WordNetLemmatizer()
 
 # Function to load links from 'All_Links.json'
 def load_links_from_json(file_path='All_Links.json'):
+    logger.debug(f"Attempting to load links from {file_path}")
     links = []
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -66,11 +68,14 @@ def load_links_from_json(file_path='All_Links.json'):
                     links.append({'url': url, 'description': description})
         if not links:
             logger.warning(f"No links found in '{file_path}'.")
+        else:
+            logger.debug(f"Loaded {len(links)} links from '{file_path}'.")
     except FileNotFoundError:
         logger.error(f"Error: '{file_path}' file not found.")
     except Exception as e:
-        logger.error(f"Error reading '{file_path}': {e}")
+        logger.error(f"Error reading '{file_path}': {e}", exc_info=True)
     return links
+
 
 # Helper function: Text preprocessing
 def preprocess_text(text):
@@ -154,8 +159,9 @@ def fetch_all_contents(links):
 def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
     global content_embeddings, bm25, links, tokenized_corpus
 
+    logger.info(f"Starting precompute_contents with re_fetch={re_fetch}")
+
     if not re_fetch and os.path.exists(cache_file):
-        # Load contents and embeddings from cache
         logger.info("Loading contents and embeddings from cache...")
         try:
             with open(cache_file, 'r', encoding='utf-8') as f:
@@ -165,21 +171,26 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
             content_embeddings = np.array(cached_data['embeddings'], dtype='float32')
             if content_embeddings.size == 0:
                 raise ValueError("Embeddings loaded from cache are empty.")
+            logger.info("Loaded cached data successfully.")
         except Exception as e:
-            logger.error(f"Failed to load cache: {e}")
+            logger.error(f"Failed to load cache: {e}", exc_info=True)
             re_fetch = True  # Force re-fetching if cache is invalid
 
     if re_fetch:
-        logger.info("Fetching and processing content from all links. This may take some time...")
+        logger.info("Fetching and processing content from all links.")
         # Load links from JSON file
         links = load_links_from_json('All_Links.json')
         if not links:
             logger.error("No links to process. Exiting.")
             return
+        else:
+            logger.debug(f"Loaded {len(links)} links.")
+
         # Reset tokenized_corpus
         tokenized_corpus = []
         # Fetch contents and save to cache
         contents, url_contents = fetch_all_contents(links)
+        logger.debug("Fetched and processed all contents.")
 
         # Now compute embeddings
         logger.info("Computing embeddings using OpenAI API...")
@@ -191,7 +202,7 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
             batch = [text for text in batch if text.strip()]
             if not batch:
                 continue
-            # Truncate content to avoid exceeding token limits (approximately 8000 characters)
+            # Truncate content to avoid exceeding token limits
             batch = [text[:8000] for text in batch]
             try:
                 response = openai.Embedding.create(
@@ -207,6 +218,7 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
 
         if not content_embeddings:
             logger.error("No embeddings were computed. Cannot proceed.")
+            return
         else:
             content_embeddings = np.array(content_embeddings, dtype='float32')
             # Save contents and embeddings to cache
@@ -233,6 +245,7 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
         logger.info("BM25 index built.")
     else:
         logger.error("Tokenized corpus is empty. BM25 index not built.")
+
 
 # Helper function: Build ANN index using FAISS
 def build_ann_index(embeddings):
@@ -378,29 +391,22 @@ def home():
     })
 
 if __name__ == '__main__':
-    re_fetch = False
+    # Set re_fetch based on an environment variable
+    re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
     cache_file = 'cached_contents.json'
 
-    # Use environment variable to decide on re-fetching content
-    re_fetch_env = os.environ.get('RE_FETCH_CONTENT', 'false').lower()
-    if re_fetch_env == 'true':
-        re_fetch = True
-        # Delete the cache file if re-fetching
-        if os.path.exists(cache_file):
-            os.remove(cache_file)
-            logger.info("Deleted the old cache file.")
-        else:
-            logger.info("Cache file not found. Will fetch fresh content.")
-    elif not os.path.exists(cache_file):
+    # Check if cache file exists; if not, set re_fetch to True
+    if not os.path.exists(cache_file):
         logger.info("Cache file not found. Fetching content and computing embeddings.")
         re_fetch = True
 
     # Precompute contents and build ANN index before starting the server
     precompute_contents(re_fetch)
 
-    # Use the port provided by the environment
+    # Use the port provided by the environment or default to 10000
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
