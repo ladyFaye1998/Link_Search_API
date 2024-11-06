@@ -23,10 +23,19 @@ app = Flask(__name__)
 
 # Initialize the OpenAI API key
 # Set your OpenAI API key here
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 #openai.api_key = 'sk-XXXX'
+
+if openai.api_key:
+    logger.info("OpenAI API key loaded successfully.")
+else:
+    logger.error("OpenAI API key is missing.")
+
 
 # Global variables for ANN index and embeddings
 ann_index = None
@@ -239,7 +248,7 @@ def build_ann_index(embeddings):
 # Function to search for the most relevant links based on query
 def find_relevant_links(query, top_n=3):
     if not links or content_embeddings is None or ann_index is None or bm25 is None:
-        logger.warning("Data is not ready for searching. Returning default results.")
+        logger.warning("Data is not ready for searching. Returning default results. ")
         # Return top_n empty results
         return [{'url': '', 'description': '', 'score': 0.0} for _ in range(top_n)]
 
@@ -369,24 +378,29 @@ def home():
     })
 
 if __name__ == '__main__':
-    # Prompt the user whether to re-fetch content
     re_fetch = False
     cache_file = 'cached_contents.json'
-    if os.path.exists(cache_file):
-        do_fetch = input("Do you want to re-fetch fresh content? (y/n): ").lower()
-        if do_fetch == 'y':
-            re_fetch = True
-            # Delete the cache file if re-fetching
+
+    # Use environment variable to decide on re-fetching content
+    re_fetch_env = os.environ.get('RE_FETCH_CONTENT', 'false').lower()
+    if re_fetch_env == 'true':
+        re_fetch = True
+        # Delete the cache file if re-fetching
+        if os.path.exists(cache_file):
             os.remove(cache_file)
             logger.info("Deleted the old cache file.")
-    else:
+        else:
+            logger.info("Cache file not found. Will fetch fresh content.")
+    elif not os.path.exists(cache_file):
         logger.info("Cache file not found. Fetching content and computing embeddings.")
         re_fetch = True
 
     # Precompute contents and build ANN index before starting the server
     precompute_contents(re_fetch)
 
-    port = int(os.environ.get("PORT", 5000))
+    # Use the port provided by the environment
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
 
 
