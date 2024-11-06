@@ -91,7 +91,7 @@ def preprocess_text(text):
 # Helper function: Extract keywords from URL
 def extract_keywords_from_url(url):
     parsed_url = requests.utils.urlparse(url)
-    path = parsed_url.path  # get the path part of the URL
+    path = parsed_url.path  # Get the path part of the URL
     # Remove file extension
     path = re.sub(r'\.\w+$', '', path)
     # Split by '/', '-', '_', etc.
@@ -384,23 +384,19 @@ def home():
         }
     })
 
-
-# Call precompute_contents at the module level
-logger.info("Starting application and initializing data structures...")
-
-re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
-cache_file = 'cached_contents.json'
-
-# Check if cache file exists; if not, set re_fetch to True
-if not os.path.exists(cache_file):
-    logger.info("Cache file not found. Fetching content and computing embeddings.")
-    re_fetch = True
-
-# Precompute contents and build ANN index
-precompute_contents(re_fetch)
-
-@app.before_first_request
+# Call precompute_contents before the application starts serving requests
+@app.before_serving
 def initialize_app():
-    logger.info("Initializing application before the first request...")
+    global re_fetch
+    logger.info("Initializing application before serving...")
+    re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
+    cache_file = 'cached_contents.json'
+
+    # Check if cache file exists; if not, set re_fetch to True
+    if not os.path.exists(cache_file):
+        logger.info("Cache file not found. Fetching content and computing embeddings.")
+        re_fetch = True
+
+    # Precompute contents and build ANN index
     precompute_contents(re_fetch)
 
