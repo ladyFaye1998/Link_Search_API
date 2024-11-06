@@ -40,6 +40,7 @@ content_embeddings = None
 bm25 = None  # BM25 instance
 tokenized_corpus = []  # For BM25
 links = []  # Initialize links
+initialization_done = False  # Flag to ensure initialization runs only once
 
 # Load NLTK data
 nltk.download('punkt', quiet=True)
@@ -190,7 +191,7 @@ def precompute_contents(re_fetch=False, cache_file='cached_contents.json'):
         # Now compute embeddings
         logger.info("Computing embeddings using OpenAI API...")
         content_embeddings = []
-        batch_size = 16  # Adjust as needed
+        batch_size = 8  # Reduce batch size to lower memory usage
         for i in range(0, len(contents), batch_size):
             batch = contents[i:i+batch_size]
             # Skip empty contents
@@ -384,19 +385,22 @@ def home():
         }
     })
 
-# Call precompute_contents before the application starts serving requests
-@app.before_serving
+# Initialize the application before handling requests
+@app.before_request
 def initialize_app():
-    global re_fetch
-    logger.info("Initializing application before serving...")
-    re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
-    cache_file = 'cached_contents.json'
+    global initialization_done
+    if not initialization_done:
+        logger.info("Initializing application before handling requests...")
+        re_fetch = os.environ.get('RE_FETCH_CONTENT', 'false').lower() == 'true'
+        cache_file = 'cached_contents.json'
 
-    # Check if cache file exists; if not, set re_fetch to True
-    if not os.path.exists(cache_file):
-        logger.info("Cache file not found. Fetching content and computing embeddings.")
-        re_fetch = True
+        # Check if cache file exists; if not, set re_fetch to True
+        if not os.path.exists(cache_file):
+            logger.info("Cache file not found. Fetching content and computing embeddings.")
+            re_fetch = True
 
-    # Precompute contents and build ANN index
-    precompute_contents(re_fetch)
+        # Precompute contents and build ANN index
+        precompute_contents(re_fetch)
+        initialization_done = True
+
 
