@@ -384,6 +384,7 @@ def home():
         }
     })
 
+
 # Call precompute_contents at the module level
 logger.info("Starting application and initializing data structures...")
 
@@ -397,4 +398,9 @@ if not os.path.exists(cache_file):
 
 # Precompute contents and build ANN index
 precompute_contents(re_fetch)
+
+@app.before_first_request
+def initialize_app():
+    logger.info("Initializing application before the first request...")
+    precompute_contents(re_fetch)
 
